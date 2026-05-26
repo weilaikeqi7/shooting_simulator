@@ -4,6 +4,7 @@ set(srcs
     "remote_hid.c"
     "shooting_app.c"
     "assets_init.c"
+    "esp_timer_stop_blocking_compat.c"
     "esp_hid_gap.c"
 )
 set(include_dirs ".")
@@ -14,9 +15,16 @@ idf_component_register(
     REQUIRES driver espressif__button esp_lvgl_adapter esp_lv_decoder hw_init esp_hid nvs_flash bt esp_event spiffs
 )
 
+# ESP-IDF v6.0.1 does not expose esp_timer_stop_blocking(), but esp_lvgl_adapter
+# v0.4.3 uses it when building against IDF 6.x. Inject a compatibility prototype
+# for that managed component and provide a weak fallback implementation in main.
+idf_component_get_property(esp_lvgl_adapter_lib espressif__esp_lvgl_adapter COMPONENT_LIB)
+target_compile_options(${esp_lvgl_adapter_lib} PRIVATE
+    "SHELL:-include ${CMAKE_CURRENT_LIST_DIR}/esp_timer_stop_blocking_compat.h"
+)
 spiffs_create_partition_image(assets assets FLASH_IN_PROJECT)
 
-# 可选：idf.py build -DAPP_ENABLE_COLOR_TEST=1
+# Optional: idf.py build -DAPP_ENABLE_COLOR_TEST=1
 if(DEFINED APP_ENABLE_COLOR_TEST)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE APP_ENABLE_COLOR_TEST=${APP_ENABLE_COLOR_TEST})
 endif()

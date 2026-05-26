@@ -172,7 +172,7 @@ dependencies:
       type: service
     version: 1.0.1
   espressif/esp_lvgl_adapter:
-    component_hash: a86c36e1f762bca480672f17ecd759f54d38fd802a709fff142ccfac4d8466a6
+    component_hash: 7012f0b59ac05302ce516424557d40d87b9819028b9319bb583e8dab3610b068
     dependencies:
     - name: espressif/button
       registry_url: https://components.espressif.com
@@ -208,7 +208,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 0.1.4
+    version: 0.4.3~1
   espressif/esp_mmap_assets:
     component_hash: b7c559238d9f4c11048b1d7302f5474e4f4f590902433efd792bd0cbf5324f2a
     dependencies:
@@ -334,6 +334,6 @@ direct_dependencies:
 - hw_init
 - idf
 - lvgl/lvgl
-manifest_hash: 410d69cfc04188a1dfd5a3a90125fe7852e0294720f71aedd7cd81b0ed7df7ce
+manifest_hash: 10cb483faddbd7c77c7912acb9e465791b894d127b767e4fbba1ec1ae0a1374c
 target: esp32s3
 version: 3.0.0
