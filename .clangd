@@ -1,2 +1,10 @@
 CompileFlags:
-    Remove: [-f*, -m*]
+  Remove:
+    - "-fzero-init-padding-bits=*"
+    - "-fno-malloc-dce"
+    - "-fstrict-volatile-bitfields"
+    - "-fno-tree-switch-conversion"
+    - "-m*"
+Diagnostics:
+  Suppress:
+    - drv_unknown_argument
