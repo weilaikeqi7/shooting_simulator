@@ -259,7 +259,7 @@ static void create_front_sight(void)
     const int32_t cy = DISP_H / 2;
 
     s_front_sight = lv_image_create(s_screen);
-    lv_image_set_src(s_front_sight, &front_sight_img);
+    lv_image_set_src(s_front_sight, FRONT_SIGHT_IMAGE_SRC);
     lv_obj_set_pos(s_front_sight, cx - FRONT_SIGHT_IMG_W / 2,
                    cy - FRONT_SIGHT_IMG_H / 2);
     lv_obj_clear_flag(s_front_sight, LV_OBJ_FLAG_CLICKABLE);

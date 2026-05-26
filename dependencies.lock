@@ -136,7 +136,7 @@ dependencies:
       require: private
       version: '>=8,<10'
     source:
-      registry_url: https://components.espressif.com
+      registry_url: https://components.espressif.com/
       type: service
     targets:
     - esp32
@@ -329,10 +329,11 @@ dependencies:
     version: 9.5.0
 direct_dependencies:
 - espressif/button
+- espressif/esp_lv_decoder
 - espressif/esp_lvgl_adapter
 - hw_init
 - idf
 - lvgl/lvgl
-manifest_hash: a621a8e96ba35286935ebba13aa8d852f6712d500ff2cf55c234122326881d36
+manifest_hash: 410d69cfc04188a1dfd5a3a90125fe7852e0294720f71aedd7cd81b0ed7df7ce
 target: esp32s3
 version: 3.0.0

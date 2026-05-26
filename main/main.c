@@ -16,6 +16,7 @@
 #include "esp_lv_adapter.h"
 #include "app_features.h"
 #include "remote_hid.h"
+#include "assets_init.h"
 #include "shooting_app.h"
 #if APP_ENABLE_COLOR_TEST
 #include "driver/gpio.h"
@@ -173,6 +174,7 @@ void app_main()
 
     /* Start the LVGL adapter */
     ESP_ERROR_CHECK(esp_lv_adapter_start());
+    ESP_ERROR_CHECK(app_assets_init());
 
     /* BLE remote: scan and connect to 68:C4:92:10:A3:66 */
     esp_err_t remote_ret = remote_hid_start(disp);
