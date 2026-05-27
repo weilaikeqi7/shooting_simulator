@@ -40,3 +40,7 @@ CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y
 # Task WDT：LVGL 在 esp_lcd_touch 读 GT911 时若 I2C 挂死，IDLE 会饿死。esp_lcd I2C 传输仍为无限等待，仅靠降速/上拉减负；
 # 略增大超时可减少误报（根本仍靠硬件与 100k I2C）。
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+
+# Prefer PSRAM for Bluedroid BLE heap allocations.
+CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST=y
+CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY=y

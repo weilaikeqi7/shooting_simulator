@@ -9,6 +9,23 @@ set(srcs
 )
 set(include_dirs ".")
 
+# Keep the RGB partial draw buffer in PSRAM. esp_lvgl_adapter v0.5.0
+# allocates this buffer in internal RAM even when the display profile uses PSRAM.
+set(esp_lvgl_adapter_display_manager
+    "${PROJECT_DIR}/managed_components/espressif__esp_lvgl_adapter/src/display/display_manager.c")
+if(EXISTS "${esp_lvgl_adapter_display_manager}")
+    file(READ "${esp_lvgl_adapter_display_manager}" adapter_display_manager_src)
+    string(REPLACE
+        "void *buf = display_manager_alloc_draw_buffer(cfg->draw_buf_pixels * color_size, false);"
+        "void *buf = display_manager_alloc_draw_buffer(cfg->draw_buf_pixels * color_size, profile->use_psram);"
+        adapter_display_manager_patched
+        "${adapter_display_manager_src}"
+    )
+    if(NOT adapter_display_manager_patched STREQUAL adapter_display_manager_src)
+        file(WRITE "${esp_lvgl_adapter_display_manager}" "${adapter_display_manager_patched}")
+    endif()
+endif()
+
 idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS ${include_dirs}
