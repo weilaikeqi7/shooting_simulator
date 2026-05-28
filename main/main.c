@@ -41,10 +41,10 @@ static const char *TAG = "main";
 #define FPS_MONITOR_INTERVAL_MS        1000
 
 /* Memory monitor task configuration */
-#define MEM_MONITOR_TASK_STACK_SIZE    3072
+#define MEM_MONITOR_TASK_STACK_SIZE    4096
 #define MEM_MONITOR_FALLBACK_STACK_SIZE 2048
 #define MEM_MONITOR_TASK_PRIORITY      2
-#define MEM_MONITOR_INTERVAL_MS        2000
+#define MEM_MONITOR_INTERVAL_MS        5000
 
 /**
  * @brief Get the configured display rotation from Kconfig
@@ -202,7 +202,7 @@ static void fps_monitor_task(void *arg)
 
     while (1) {
         if (esp_lv_adapter_get_fps(disp, &fps) == ESP_OK) {
-            //ESP_LOGI(TAG, "Current FPS: %lu", fps);
+            ESP_LOGI(TAG, "Current FPS: %lu", fps);
         }
         vTaskDelay(pdMS_TO_TICKS(FPS_MONITOR_INTERVAL_MS));
     }
@@ -318,7 +318,12 @@ void app_main()
     /* Start the LVGL adapter */
     ESP_ERROR_CHECK(esp_lv_adapter_start());
     log_heap_checkpoint("after lvgl adapter start");
-    ESP_ERROR_CHECK(app_assets_init());
+    esp_err_t assets_ret = esp_lv_adapter_lock(-1);
+    if (assets_ret == ESP_OK) {
+        assets_ret = app_assets_init();
+        esp_lv_adapter_unlock();
+    }
+    ESP_ERROR_CHECK(assets_ret);
     log_heap_checkpoint("after assets init");
 
     /* BLE remote: scan and connect to 68:C4:92:10:A3:66 */

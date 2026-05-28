@@ -1,5 +1,6 @@
 #include "shooting_app.h"
 
+#include "assets_init.h"
 #include "front_sight_image.h"
 #include "remote_hid.h"
 #include <stdbool.h>
@@ -21,6 +22,10 @@
 #define AIM_PEEP_MIN_DIAM      90
 #define AIM_PEEP_MAX_DIAM      280
 #define AIM_PEEP_STEP          12
+#define FONT_14                app_assets_font_14()
+#define FONT_20                app_assets_font_20()
+#define FONT_24                app_assets_font_24()
+#define FONT_26                app_assets_font_26()
 
 typedef enum {
     APP_SCENE_MENU,
@@ -74,9 +79,9 @@ static const point_i_t s_four_point_defaults[4] = {
 };
 
 static const menu_item_t s_menu_items[] = {
-    { "1  Linked Aim Simulation", APP_SCENE_AIM },
-    { "2  4-Point Circle Zeroing", APP_SCENE_CAL_CIRCLE },
-    { "4  4-Point Chest Zeroing", APP_SCENE_CAL_CHEST },
+    { "1  联动瞄准模拟", APP_SCENE_AIM },
+    { "2  圆靶四点校准", APP_SCENE_CAL_CIRCLE },
+    { "4  胸环靶四点校准", APP_SCENE_CAL_CHEST },
 };
 
 static uint32_t isqrt32(uint32_t value)
@@ -206,15 +211,15 @@ static void menu_refresh(void)
     set_screen_bg(0x151a1f);
     s_scene = APP_SCENE_MENU;
 
-    make_label(s_screen, "Shooting Training", 30, 24, &lv_font_montserrat_26, 0xffffff);
-    make_label(s_screen, "Joystick or C/D select   O OK", 34, 62, &lv_font_montserrat_20, 0x9fb1c1);
+    make_label(s_screen, "射击训练", 30, 24, FONT_26, 0xffffff);
+    make_label(s_screen, "摇杆或C/D选择   O确认", 34, 62, FONT_20, 0x9fb1c1);
 
     for (uint8_t i = 0; i < (uint8_t)(sizeof(s_menu_items) / sizeof(s_menu_items[0])); i++) {
         int32_t y = 128 + i * 78;
         uint32_t fill = (i == s_menu_index) ? 0x2d5f83 : 0x232a31;
         uint32_t border = (i == s_menu_index) ? 0x9ad7ff : 0x404953;
         lv_obj_t *row = make_rect(s_screen, 70, y, 660, 54, fill, LV_OPA_COVER, border, 2, 6);
-        lv_obj_t *label = make_label(row, s_menu_items[i].title, 22, 15, &lv_font_montserrat_20,
+        lv_obj_t *label = make_label(row, s_menu_items[i].title, 22, 15, FONT_20,
                                      i == s_menu_index ? 0xffffff : 0xc8d1dc);
         lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(row, menu_item_event_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
@@ -246,10 +251,10 @@ static void aim_update(void)
 
     if (aim_is_aligned()) {
         lv_obj_set_style_text_color(s_status, lv_color_hex(0x70ff98), 0);
-        update_status("AIM OK");
+        update_status("已瞄准");
     } else {
         lv_obj_set_style_text_color(s_status, lv_color_hex(0xffffff), 0);
-        update_status("NOT AIMED");
+        update_status("未瞄准");
     }
 }
 
@@ -272,10 +277,10 @@ static void load_aim_scene(void)
     set_screen_bg(0x245c38);
     s_scene = APP_SCENE_AIM;
 
-    s_title = make_label(s_screen, "1 Linked Aim", 18, 16, &lv_font_montserrat_24, 0xffffff);
-    s_status = make_label(s_screen, "NOT AIMED", 620, 18, &lv_font_montserrat_20, 0xffffff);
-    make_label(s_screen, "Joystick move   C zoom in   D zoom out   ESC",
-               20, 446, &lv_font_montserrat_20, 0xe3f3e6);
+    s_title = make_label(s_screen, "1 联动瞄准", 18, 16, FONT_24, 0xffffff);
+    s_status = make_label(s_screen, "未瞄准", 650, 18, FONT_20, 0xffffff);
+    make_label(s_screen, "摇杆移动   C放大   D缩小   ESC",
+               20, 446, FONT_20, 0xe3f3e6);
 
     s_peep_pos.x = DISP_W / 2 - 135;
     s_peep_pos.y = DISP_H / 2 - 52;
@@ -328,14 +333,14 @@ static void update_cal_status(void)
 {
     char buf[96];
     if (s_cal_phase == CAL_PHASE_COLLECT) {
-        snprintf(buf, sizeof(buf), "Point %u/4  X:%ld Y:%ld",
+        snprintf(buf, sizeof(buf), "第%u/4点  X:%ld Y:%ld",
                  (unsigned)(s_point_index + 1),
                  (long)s_target_pos.x,
                  (long)s_target_pos.y);
     } else if (s_cal_phase == CAL_PHASE_SHOW_POINTS) {
-        snprintf(buf, sizeof(buf), "Saved points shown   O score");
+        snprintf(buf, sizeof(buf), "已显示保存点   O计算");
     } else {
-        snprintf(buf, sizeof(buf), "O reset   ESC");
+        snprintf(buf, sizeof(buf), "O重置   ESC");
     }
     update_status(buf);
 }
@@ -369,7 +374,7 @@ static void draw_chest_target(void)
                     0xffffff, LV_OPA_TRANSP, ring_colors[i], 4);
     }
     make_circle(s_target, size / 2, size / 2, 12, 0xff3333, LV_OPA_COVER, 0xffffff, 2);
-    make_label(s_target, "10", size / 2 + 12, size / 2 - 9, &lv_font_montserrat_14, 0x111111);
+    make_label(s_target, "10", size / 2 + 12, size / 2 - 9, FONT_14, 0x111111);
 
     target_apply_pos();
 }
@@ -381,11 +386,11 @@ static void create_cal_base(bool chest)
     s_scene = chest ? APP_SCENE_CAL_CHEST : APP_SCENE_CAL_CIRCLE;
     s_cal_is_chest = chest;
 
-    s_title = make_label(s_screen, chest ? "4 Chest 4-Point Zeroing" : "2 Circle 4-Point Zeroing",
-                         18, 16, &lv_font_montserrat_24, 0xffffff);
-    s_status = make_label(s_screen, "", 470, 18, &lv_font_montserrat_20, 0xffffff);
-    make_label(s_screen, "A Right  B Left  C Up  D Down  O OK  ESC",
-               20, 446, &lv_font_montserrat_20, 0xdde7ef);
+    s_title = make_label(s_screen, chest ? "4 胸环靶四点校准" : "2 圆靶四点校准",
+                         18, 16, FONT_24, 0xffffff);
+    s_status = make_label(s_screen, "", 430, 18, FONT_20, 0xffffff);
+    make_label(s_screen, "A右  B左  C上  D下  O确认  ESC",
+               20, 446, FONT_20, 0xdde7ef);
 
     if (chest) {
         draw_chest_target();
@@ -417,7 +422,7 @@ static void mark_saved_point(point_i_t p, uint8_t idx)
     char label_buf[4];
     snprintf(label_buf, sizeof(label_buf), "%u", (unsigned)(idx + 1));
     lv_obj_t *label = make_label(s_screen, label_buf, p.x + 12, p.y - 18,
-                                 &lv_font_montserrat_14, 0xffffff);
+                                 FONT_14, 0xffffff);
     (void)label;
 }
 
@@ -425,10 +430,10 @@ static void show_saved_points(void)
 {
     clear_scene();
     set_screen_bg(s_cal_is_chest ? 0x1f4e2c : 0x000000);
-    s_title = make_label(s_screen, s_cal_is_chest ? "4 Saved Ten-Ring Centers" : "2 Saved Circle Points",
-                         18, 16, &lv_font_montserrat_24, 0xffffff);
-    s_status = make_label(s_screen, "", 500, 18, &lv_font_montserrat_20, 0xffffff);
-    make_label(s_screen, "O score   ESC", 20, 446, &lv_font_montserrat_20, 0xdde7ef);
+    s_title = make_label(s_screen, s_cal_is_chest ? "4 已保存胸环中心" : "2 已保存圆靶点位",
+                         18, 16, FONT_24, 0xffffff);
+    s_status = make_label(s_screen, "", 500, 18, FONT_20, 0xffffff);
+    make_label(s_screen, "O计算   ESC", 20, 446, FONT_20, 0xdde7ef);
 
     for (uint8_t i = 0; i < 4; i++) {
         mark_saved_point(s_saved_points[i], i);
@@ -462,25 +467,25 @@ static void show_score(void)
 
     clear_scene();
     set_screen_bg(0x111820);
-    s_title = make_label(s_screen, "Zeroing Score", 28, 28, &lv_font_montserrat_26, 0xffffff);
-    s_status = make_label(s_screen, "", 520, 28, &lv_font_montserrat_20, 0xffffff);
+    s_title = make_label(s_screen, "校准结果", 28, 28, FONT_26, 0xffffff);
+    s_status = make_label(s_screen, "", 520, 28, FONT_20, 0xffffff);
 
     char line[128];
-    snprintf(line, sizeof(line), "Center: X %ld   Y %ld", (long)avg_x, (long)avg_y);
-    make_label(s_screen, line, 70, 130, &lv_font_montserrat_24, 0xcfe4ff);
+    snprintf(line, sizeof(line), "中心点：X %ld   Y %ld", (long)avg_x, (long)avg_y);
+    make_label(s_screen, line, 70, 130, FONT_24, 0xcfe4ff);
 
-    snprintf(line, sizeof(line), "Max spread error: %lu px", (unsigned long)max_dist);
-    make_label(s_screen, line, 70, 184, &lv_font_montserrat_26, 0xffffff);
+    snprintf(line, sizeof(line), "最大分散误差：%lu px", (unsigned long)max_dist);
+    make_label(s_screen, line, 70, 184, FONT_26, 0xffffff);
 
-    snprintf(line, sizeof(line), "P1 error: %lu px   P2 error: %lu px",
+    snprintf(line, sizeof(line), "第1点误差：%lu px   第2点误差：%lu px",
              (unsigned long)point_dist[0], (unsigned long)point_dist[1]);
-    make_label(s_screen, line, 70, 238, &lv_font_montserrat_20, 0xdde7ef);
+    make_label(s_screen, line, 70, 238, FONT_20, 0xdde7ef);
 
-    snprintf(line, sizeof(line), "P3 error: %lu px   P4 error: %lu px",
+    snprintf(line, sizeof(line), "第3点误差：%lu px   第4点误差：%lu px",
              (unsigned long)point_dist[2], (unsigned long)point_dist[3]);
-    make_label(s_screen, line, 70, 278, &lv_font_montserrat_20, 0xdde7ef);
+    make_label(s_screen, line, 70, 278, FONT_20, 0xdde7ef);
 
-    make_label(s_screen, "O reset   ESC", 70, 346, &lv_font_montserrat_20, 0x9fb1c1);
+    make_label(s_screen, "O重置   ESC", 70, 346, FONT_20, 0x9fb1c1);
     s_cal_phase = CAL_PHASE_SHOW_RESULT;
     update_cal_status();
 }

@@ -13,6 +13,12 @@ dependencies:
   espressif/esp_lv_decoder:
     version: "*"
 
+  espressif/esp_lv_fs:
+    version: "*"
+
+  espressif/esp_mmap_assets:
+    version: "*"
+
   hw_init:
     version: "*"
     override_path: "../common/hw_init"
