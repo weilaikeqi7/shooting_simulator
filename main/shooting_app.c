@@ -348,9 +348,7 @@ static void update_cal_status(void)
 static void draw_round_target(void)
 {
     s_target = make_circle(s_screen, s_target_pos.x, s_target_pos.y, ROUND_TARGET_DIAM_PX,
-                           0xffffff, LV_OPA_TRANSP, 0xffffff, 7);
-    make_circle(s_target, ROUND_TARGET_DIAM_PX / 2, ROUND_TARGET_DIAM_PX / 2, 10,
-                0xffffff, LV_OPA_COVER, 0xffffff, 0);
+                           0xffffff, LV_OPA_COVER, 0xffffff, 0);
 }
 
 static void draw_chest_target(void)
