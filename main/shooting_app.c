@@ -17,6 +17,8 @@
 #define FAST_MOVE_STEP_PX      24
 #define ROUND_TARGET_DIAM_PX   (3 * PX_PER_CM)
 #define CHEST_TARGET_SIZE_PX   340
+#define AIM_FIXED_TARGET_CX    178
+#define AIM_FIXED_TARGET_CY    250
 #define AIM_FRONT_W            FRONT_SIGHT_IMG_W
 #define AIM_FRONT_H            FRONT_SIGHT_IMG_H
 #define AIM_PEEP_MIN_DIAM      90
@@ -68,8 +70,11 @@ static bool s_cal_is_chest;
 
 static lv_obj_t *s_front_sight;
 static lv_obj_t *s_peep;
+static lv_obj_t *s_aim_target;
+static point_i_t s_front_pos;
 static point_i_t s_peep_pos;
 static int32_t s_peep_diam;
+static bool s_aim_linked;
 
 static const point_i_t s_four_point_defaults[4] = {
     { DISP_W / 2, DISP_H / 2 },
@@ -104,6 +109,19 @@ static uint32_t isqrt32(uint32_t value)
     }
 
     return res;
+}
+
+static uint32_t px_to_mm10(uint32_t px)
+{
+    return (px * 100U + PX_PER_CM / 2U) / PX_PER_CM;
+}
+
+static void format_mm(char *buf, size_t size, uint32_t px)
+{
+    const uint32_t mm10 = px_to_mm10(px);
+    snprintf(buf, size, "%lu.%lu mm",
+             (unsigned long)(mm10 / 10U),
+             (unsigned long)(mm10 % 10U));
 }
 
 static int32_t clamp_i32(int32_t v, int32_t min_v, int32_t max_v)
@@ -190,6 +208,7 @@ static void clear_scene(void)
     s_target = NULL;
     s_front_sight = NULL;
     s_peep = NULL;
+    s_aim_target = NULL;
 }
 
 static void update_status(const char *text)
@@ -202,6 +221,7 @@ static void update_status(const char *text)
 static void load_menu(void);
 static void load_aim_scene(void);
 static void load_cal_scene(bool chest);
+static lv_obj_t *create_chest_target_obj(lv_obj_t *parent);
 
 static void menu_item_event_cb(lv_event_t *e);
 
@@ -234,10 +254,8 @@ static void load_menu(void)
 
 static bool aim_is_aligned(void)
 {
-    const int32_t front_cx = DISP_W / 2;
-    const int32_t front_cy = DISP_H / 2;
-    const int32_t dx = abs(s_peep_pos.x - front_cx);
-    const int32_t dy = abs(s_peep_pos.y - front_cy);
+    const int32_t dx = abs(s_peep_pos.x - s_front_pos.x);
+    const int32_t dy = abs(s_peep_pos.y - s_front_pos.y);
     const int32_t peep_r = s_peep_diam / 2;
     const int32_t front_rx = AIM_FRONT_W / 2;
     const int32_t front_ry = AIM_FRONT_H / 2;
@@ -245,9 +263,26 @@ static bool aim_is_aligned(void)
     return peep_r >= dx + front_rx + 6 && peep_r >= dy + front_ry + 6;
 }
 
+static void aim_apply_pos(void)
+{
+    if (s_peep) {
+        set_obj_center(s_peep, s_peep_pos.x, s_peep_pos.y, s_peep_diam, s_peep_diam);
+    }
+    if (s_front_sight) {
+        lv_obj_set_pos(s_front_sight, s_front_pos.x - FRONT_SIGHT_IMG_W / 2,
+                       s_front_pos.y - FRONT_SIGHT_IMG_H / 2);
+    }
+}
+
 static void aim_update(void)
 {
-    set_obj_center(s_peep, s_peep_pos.x, s_peep_pos.y, s_peep_diam, s_peep_diam);
+    aim_apply_pos();
+
+    if (s_aim_linked) {
+        lv_obj_set_style_text_color(s_status, lv_color_hex(0x70ff98), 0);
+        update_status("联动瞄准");
+        return;
+    }
 
     if (aim_is_aligned()) {
         lv_obj_set_style_text_color(s_status, lv_color_hex(0x70ff98), 0);
@@ -260,15 +295,23 @@ static void aim_update(void)
 
 static void create_front_sight(void)
 {
-    const int32_t cx = DISP_W / 2;
-    const int32_t cy = DISP_H / 2;
-
     s_front_sight = lv_image_create(s_screen);
     lv_image_set_src(s_front_sight, FRONT_SIGHT_IMAGE_SRC);
-    lv_obj_set_pos(s_front_sight, cx - FRONT_SIGHT_IMG_W / 2,
-                   cy - FRONT_SIGHT_IMG_H / 2);
     lv_obj_clear_flag(s_front_sight, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(s_front_sight, LV_OBJ_FLAG_SCROLLABLE);
+    aim_apply_pos();
+}
+
+static void show_aim_fixed_target(void)
+{
+    if (s_aim_target) {
+        return;
+    }
+
+    s_aim_target = create_chest_target_obj(s_screen);
+    set_obj_center(s_aim_target, AIM_FIXED_TARGET_CX, AIM_FIXED_TARGET_CY,
+                   CHEST_TARGET_SIZE_PX, CHEST_TARGET_SIZE_PX);
+    lv_obj_move_background(s_aim_target);
 }
 
 static void load_aim_scene(void)
@@ -279,12 +322,15 @@ static void load_aim_scene(void)
 
     s_title = make_label(s_screen, "1 联动瞄准", 18, 16, FONT_24, 0xffffff);
     s_status = make_label(s_screen, "未瞄准", 650, 18, FONT_20, 0xffffff);
-    make_label(s_screen, "摇杆移动   C放大   D缩小   ESC",
+    make_label(s_screen, "摇杆移动   O显示标靶   C放大   D缩小   ESC",
                20, 446, FONT_20, 0xe3f3e6);
 
     s_peep_pos.x = DISP_W / 2 - 135;
     s_peep_pos.y = DISP_H / 2 - 52;
+    s_front_pos.x = DISP_W / 2;
+    s_front_pos.y = DISP_H / 2;
     s_peep_diam = 150;
+    s_aim_linked = false;
 
     create_front_sight();
 
@@ -351,28 +397,35 @@ static void draw_round_target(void)
                            0xffffff, LV_OPA_COVER, 0xffffff, 0);
 }
 
-static void draw_chest_target(void)
+static lv_obj_t *create_chest_target_obj(lv_obj_t *parent)
 {
     const int32_t size = CHEST_TARGET_SIZE_PX;
-    s_target = lv_obj_create(s_screen);
-    style_plain(s_target);
-    lv_obj_set_size(s_target, size, size);
-    lv_obj_set_style_bg_opa(s_target, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(s_target, 0, 0);
-    lv_obj_set_style_pad_all(s_target, 0, 0);
+    lv_obj_t *target = lv_obj_create(parent);
+    style_plain(target);
+    lv_obj_set_size(target, size, size);
+    lv_obj_set_style_bg_opa(target, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(target, 0, 0);
+    lv_obj_set_style_pad_all(target, 0, 0);
 
-    make_circle(s_target, size / 2, 72, 64, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 2);
-    make_rect(s_target, 74, 96, 192, 210, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 3, 34);
-    make_rect(s_target, 48, 154, 244, 130, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 3, 28);
+    make_circle(target, size / 2, 72, 64, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 2);
+    make_rect(target, 74, 96, 192, 210, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 3, 34);
+    make_rect(target, 48, 154, 244, 130, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 3, 28);
 
     const uint32_t ring_colors[] = { 0x111111, 0xffffff, 0x111111, 0xffffff, 0x111111 };
     const int32_t ring_diams[] = { 190, 154, 118, 82, 46 };
     for (uint8_t i = 0; i < 5; i++) {
-        make_circle(s_target, size / 2, size / 2, ring_diams[i],
+        make_circle(target, size / 2, size / 2, ring_diams[i],
                     0xffffff, LV_OPA_TRANSP, ring_colors[i], 4);
     }
-    make_circle(s_target, size / 2, size / 2, 12, 0xff3333, LV_OPA_COVER, 0xffffff, 2);
-    make_label(s_target, "10", size / 2 + 12, size / 2 - 9, FONT_14, 0x111111);
+    make_circle(target, size / 2, size / 2, 12, 0xff3333, LV_OPA_COVER, 0xffffff, 2);
+    make_label(target, "10", size / 2 + 12, size / 2 - 9, FONT_14, 0x111111);
+
+    return target;
+}
+
+static void draw_chest_target(void)
+{
+    s_target = create_chest_target_obj(s_screen);
 
     target_apply_pos();
 }
@@ -469,21 +522,25 @@ static void show_score(void)
     s_status = make_label(s_screen, "", 520, 28, FONT_20, 0xffffff);
 
     char line[128];
-    snprintf(line, sizeof(line), "中心点：X %ld   Y %ld", (long)avg_x, (long)avg_y);
-    make_label(s_screen, line, 70, 130, FONT_24, 0xcfe4ff);
+    char mm_buf[4][24];
+    char max_buf[24];
+    format_mm(max_buf, sizeof(max_buf), max_dist);
+    for (uint8_t i = 0; i < 4; i++) {
+        format_mm(mm_buf[i], sizeof(mm_buf[i]), point_dist[i]);
+    }
 
-    snprintf(line, sizeof(line), "最大分散误差：%lu px", (unsigned long)max_dist);
-    make_label(s_screen, line, 70, 184, FONT_26, 0xffffff);
+    snprintf(line, sizeof(line), "最大分散误差：%s", max_buf);
+    make_label(s_screen, line, 70, 142, FONT_26, 0xffffff);
 
-    snprintf(line, sizeof(line), "第1点误差：%lu px   第2点误差：%lu px",
-             (unsigned long)point_dist[0], (unsigned long)point_dist[1]);
-    make_label(s_screen, line, 70, 238, FONT_20, 0xdde7ef);
+    snprintf(line, sizeof(line), "第1点误差：%s   第2点误差：%s",
+             mm_buf[0], mm_buf[1]);
+    make_label(s_screen, line, 70, 212, FONT_20, 0xdde7ef);
 
-    snprintf(line, sizeof(line), "第3点误差：%lu px   第4点误差：%lu px",
-             (unsigned long)point_dist[2], (unsigned long)point_dist[3]);
-    make_label(s_screen, line, 70, 278, FONT_20, 0xdde7ef);
+    snprintf(line, sizeof(line), "第3点误差：%s   第4点误差：%s",
+             mm_buf[2], mm_buf[3]);
+    make_label(s_screen, line, 70, 256, FONT_20, 0xdde7ef);
 
-    make_label(s_screen, "O重置   ESC", 70, 346, FONT_20, 0x9fb1c1);
+    make_label(s_screen, "O重置   ESC", 70, 342, FONT_20, 0x9fb1c1);
     s_cal_phase = CAL_PHASE_SHOW_RESULT;
     update_cal_status();
 }
@@ -569,6 +626,8 @@ static uint32_t normalize_aim_key(uint32_t key)
         return LV_KEY_NEXT;
     case REMOTE_KEY_LOOKBON_BTN_D:
         return LV_KEY_PREV;
+    case REMOTE_KEY_LOOKBON_BTN_O:
+        return LV_KEY_ENTER;
     case REMOTE_KEY_LOOKBON_BTN_BACK:
         return LV_KEY_ESC;
     default:
@@ -630,20 +689,32 @@ static void handle_aim_key(uint32_t key)
     int32_t step = MOVE_STEP_PX;
     if (key == LV_KEY_UP) {
         s_peep_pos.y -= step;
+        if (s_aim_linked) {
+            s_front_pos.y -= step;
+        }
     } else if (key == LV_KEY_DOWN) {
         s_peep_pos.y += step;
+        if (s_aim_linked) {
+            s_front_pos.y += step;
+        }
     } else if (key == LV_KEY_LEFT) {
         s_peep_pos.x -= step;
+        if (s_aim_linked) {
+            s_front_pos.x -= step;
+        }
     } else if (key == LV_KEY_RIGHT) {
         s_peep_pos.x += step;
+        if (s_aim_linked) {
+            s_front_pos.x += step;
+        }
     } else if (key == LV_KEY_NEXT) {
         s_peep_diam += AIM_PEEP_STEP;
     } else if (key == LV_KEY_PREV) {
         s_peep_diam -= AIM_PEEP_STEP;
     } else if (key == LV_KEY_ENTER) {
-        s_peep_pos.x = DISP_W / 2 - 135;
-        s_peep_pos.y = DISP_H / 2 - 52;
-        s_peep_diam = 150;
+        s_aim_linked = true;
+        s_front_pos = s_peep_pos;
+        show_aim_fixed_target();
     } else if (key == LV_KEY_ESC) {
         load_menu();
         return;
@@ -651,6 +722,9 @@ static void handle_aim_key(uint32_t key)
 
     s_peep_pos.x = clamp_i32(s_peep_pos.x, 0, DISP_W);
     s_peep_pos.y = clamp_i32(s_peep_pos.y, 0, DISP_H);
+    if (s_aim_linked) {
+        s_front_pos = s_peep_pos;
+    }
     s_peep_diam = clamp_i32(s_peep_diam, AIM_PEEP_MIN_DIAM, AIM_PEEP_MAX_DIAM);
     aim_update();
 }
@@ -740,6 +814,9 @@ static void screen_pointer_event_cb(lv_event_t *e)
     if (s_scene == APP_SCENE_AIM) {
         s_peep_pos.x = clamp_i32(p.x, 0, DISP_W);
         s_peep_pos.y = clamp_i32(p.y, 0, DISP_H);
+        if (s_aim_linked) {
+            s_front_pos = s_peep_pos;
+        }
         aim_update();
     } else {
         s_target_pos.x = clamp_i32(p.x, 0, DISP_W - 1);
