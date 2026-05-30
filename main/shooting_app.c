@@ -86,7 +86,7 @@ static const point_i_t s_four_point_defaults[4] = {
 static const menu_item_t s_menu_items[] = {
     { "1  联动瞄准模拟", APP_SCENE_AIM },
     { "2  圆靶四点校准", APP_SCENE_CAL_CIRCLE },
-    { "4  胸环靶四点校准", APP_SCENE_CAL_CHEST },
+    { "3  胸环靶四点校准", APP_SCENE_CAL_CHEST },
 };
 
 static uint32_t isqrt32(uint32_t value)
@@ -437,7 +437,7 @@ static void create_cal_base(bool chest)
     s_scene = chest ? APP_SCENE_CAL_CHEST : APP_SCENE_CAL_CIRCLE;
     s_cal_is_chest = chest;
 
-    s_title = make_label(s_screen, chest ? "4 胸环靶四点校准" : "2 圆靶四点校准",
+    s_title = make_label(s_screen, chest ? "3 胸环靶四点校准" : "2 圆靶四点校准",
                          18, 16, FONT_24, 0xffffff);
     s_status = make_label(s_screen, "", 430, 18, FONT_20, 0xffffff);
     make_label(s_screen, "A右  B左  C上  D下  O确认  ESC",
@@ -481,7 +481,7 @@ static void show_saved_points(void)
 {
     clear_scene();
     set_screen_bg(s_cal_is_chest ? 0x1f4e2c : 0x000000);
-    s_title = make_label(s_screen, s_cal_is_chest ? "4 已保存胸环中心" : "2 已保存圆靶点位",
+    s_title = make_label(s_screen, s_cal_is_chest ? "3 已保存胸环中心" : "2 已保存圆靶点位",
                          18, 16, FONT_24, 0xffffff);
     s_status = make_label(s_screen, "", 500, 18, FONT_20, 0xffffff);
     make_label(s_screen, "O计算   ESC", 20, 446, FONT_20, 0xdde7ef);
