@@ -13,7 +13,7 @@
 #define DISP_W                 800
 #define DISP_H                 480
 #define PX_PER_CM              52
-#define MOVE_STEP_PX           8
+#define MOVE_STEP_PX           2
 #define FAST_MOVE_STEP_PX      24
 #define ROUND_TARGET_DIAM_PX   (3 * PX_PER_CM)
 #define CHEST_TARGET_SIZE_PX   340
@@ -713,7 +713,6 @@ static void handle_aim_key(uint32_t key)
         s_peep_diam -= AIM_PEEP_STEP;
     } else if (key == LV_KEY_ENTER) {
         s_aim_linked = true;
-        s_front_pos = s_peep_pos;
         show_aim_fixed_target();
     } else if (key == LV_KEY_ESC) {
         load_menu();
@@ -722,9 +721,6 @@ static void handle_aim_key(uint32_t key)
 
     s_peep_pos.x = clamp_i32(s_peep_pos.x, 0, DISP_W);
     s_peep_pos.y = clamp_i32(s_peep_pos.y, 0, DISP_H);
-    if (s_aim_linked) {
-        s_front_pos = s_peep_pos;
-    }
     s_peep_diam = clamp_i32(s_peep_diam, AIM_PEEP_MIN_DIAM, AIM_PEEP_MAX_DIAM);
     aim_update();
 }
@@ -812,10 +808,13 @@ static void screen_pointer_event_cb(lv_event_t *e)
     lv_point_t p;
     lv_indev_get_point(indev, &p);
     if (s_scene == APP_SCENE_AIM) {
+        const int32_t old_x = s_peep_pos.x;
+        const int32_t old_y = s_peep_pos.y;
         s_peep_pos.x = clamp_i32(p.x, 0, DISP_W);
         s_peep_pos.y = clamp_i32(p.y, 0, DISP_H);
         if (s_aim_linked) {
-            s_front_pos = s_peep_pos;
+            s_front_pos.x += s_peep_pos.x - old_x;
+            s_front_pos.y += s_peep_pos.y - old_y;
         }
         aim_update();
     } else {
