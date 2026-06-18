@@ -182,7 +182,7 @@ static void queue_lvgl_key(uint32_t key)
         (void)xQueueSend(s_key_queue, &key, 0);
     }
 
-    ESP_LOGI(TAG, "Remote key -> LVGL %s", lv_key_name(key));
+    ESP_LOGD(TAG, "Remote key -> LVGL %s", lv_key_name(key));
 }
 
 static bool lookbon_key_from_code(uint8_t code, uint32_t *key)
@@ -534,8 +534,7 @@ static void enumerate_lookbon_chars(esp_gatt_if_t gattc_if)
 
 static void handle_lookbon_notify(uint16_t handle, const uint8_t *data, uint16_t len, bool is_notify)
 {
-    ESP_LOGI(TAG, "LOOKBON RX handle:%u len:%u %s", handle, len, is_notify ? "notify" : "indicate");
-    ESP_LOG_BUFFER_HEX(TAG, data, len);
+    ESP_LOGD(TAG, "LOOKBON RX handle:%u len:%u %s", handle, len, is_notify ? "notify" : "indicate");
 
     uint32_t key = 0;
     if (decode_remote_key(data, len, &key)) {

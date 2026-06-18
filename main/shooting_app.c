@@ -1,6 +1,7 @@
 #include "shooting_app.h"
 
 #include "assets_init.h"
+#include "chest_target_image.h"
 #include "front_sight_image.h"
 #include "remote_hid.h"
 #include <stdbool.h>
@@ -13,10 +14,13 @@
 #define DISP_W                 800
 #define DISP_H                 480
 #define PX_PER_CM              52
-#define MOVE_STEP_PX           2
+#define AIM_MOVE_STEP_PX       4
+#define CAL_MOVE_STEP_PX       6
 #define FAST_MOVE_STEP_PX      24
 #define ROUND_TARGET_DIAM_PX   (3 * PX_PER_CM)
-#define CHEST_TARGET_SIZE_PX   340
+#define CHEST_TARGET_SIZE_PX   300
+#define CHEST_TARGET_ANIM_MS   45
+#define CHEST_STATUS_UPDATE_MS 120
 #define AIM_FIXED_TARGET_CX    178
 #define AIM_FIXED_TARGET_CY    250
 #define AIM_FRONT_W            FRONT_SIGHT_IMG_W
@@ -67,6 +71,7 @@ static point_i_t s_saved_points[4];
 static uint8_t s_point_index;
 static cal_phase_t s_cal_phase;
 static bool s_cal_is_chest;
+static uint32_t s_last_status_tick;
 
 static lv_obj_t *s_front_sight;
 static lv_obj_t *s_peep;
@@ -317,7 +322,7 @@ static void show_aim_fixed_target(void)
 static void load_aim_scene(void)
 {
     clear_scene();
-    set_screen_bg(0x245c38);
+    set_screen_bg(0x17202a);
     s_scene = APP_SCENE_AIM;
 
     s_title = make_label(s_screen, "1 联动瞄准", 18, 16, FONT_24, 0xffffff);
@@ -366,18 +371,58 @@ static void target_apply_pos(void)
 
     if (s_cal_is_chest) {
         clamp_chest_target();
-        set_obj_center(s_target, s_target_pos.x, s_target_pos.y,
-                       CHEST_TARGET_SIZE_PX, CHEST_TARGET_SIZE_PX);
+        lv_obj_set_pos(s_target, s_target_pos.x - CHEST_TARGET_SIZE_PX / 2,
+                       s_target_pos.y - CHEST_TARGET_SIZE_PX / 2);
     } else {
         clamp_circle_target();
-        set_obj_center(s_target, s_target_pos.x, s_target_pos.y,
-                       ROUND_TARGET_DIAM_PX, ROUND_TARGET_DIAM_PX);
+        lv_obj_set_pos(s_target, s_target_pos.x - ROUND_TARGET_DIAM_PX / 2,
+                       s_target_pos.y - ROUND_TARGET_DIAM_PX / 2);
     }
 }
 
-static void update_cal_status(void)
+static void animate_chest_target_to_pos(void)
+{
+    if (!s_target) {
+        return;
+    }
+
+    clamp_chest_target();
+    const int32_t target_x = s_target_pos.x - CHEST_TARGET_SIZE_PX / 2;
+    const int32_t target_y = s_target_pos.y - CHEST_TARGET_SIZE_PX / 2;
+
+    lv_anim_del(s_target, (lv_anim_exec_xcb_t)lv_obj_set_x);
+    lv_anim_del(s_target, (lv_anim_exec_xcb_t)lv_obj_set_y);
+
+    lv_anim_t anim_x;
+    lv_anim_init(&anim_x);
+    lv_anim_set_var(&anim_x, s_target);
+    lv_anim_set_values(&anim_x, lv_obj_get_x(s_target), target_x);
+    lv_anim_set_duration(&anim_x, CHEST_TARGET_ANIM_MS);
+    lv_anim_set_path_cb(&anim_x, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb(&anim_x, (lv_anim_exec_xcb_t)lv_obj_set_x);
+    lv_anim_start(&anim_x);
+
+    lv_anim_t anim_y;
+    lv_anim_init(&anim_y);
+    lv_anim_set_var(&anim_y, s_target);
+    lv_anim_set_values(&anim_y, lv_obj_get_y(s_target), target_y);
+    lv_anim_set_duration(&anim_y, CHEST_TARGET_ANIM_MS);
+    lv_anim_set_path_cb(&anim_y, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb(&anim_y, (lv_anim_exec_xcb_t)lv_obj_set_y);
+    lv_anim_start(&anim_y);
+}
+
+static void update_cal_status(bool force)
 {
     char buf[96];
+    uint32_t now = lv_tick_get();
+
+    if (!force && s_cal_phase == CAL_PHASE_COLLECT && s_cal_is_chest &&
+        now - s_last_status_tick < CHEST_STATUS_UPDATE_MS) {
+        return;
+    }
+    s_last_status_tick = now;
+
     if (s_cal_phase == CAL_PHASE_COLLECT) {
         snprintf(buf, sizeof(buf), "第%u/4点  X:%ld Y:%ld",
                  (unsigned)(s_point_index + 1),
@@ -407,18 +452,12 @@ static lv_obj_t *create_chest_target_obj(lv_obj_t *parent)
     lv_obj_set_style_border_width(target, 0, 0);
     lv_obj_set_style_pad_all(target, 0, 0);
 
-    make_circle(target, size / 2, 72, 64, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 2);
-    make_rect(target, 74, 96, 192, 210, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 3, 34);
-    make_rect(target, 48, 154, 244, 130, 0xc8b58b, LV_OPA_COVER, 0x1f1f1f, 3, 28);
-
-    const uint32_t ring_colors[] = { 0x111111, 0xffffff, 0x111111, 0xffffff, 0x111111 };
-    const int32_t ring_diams[] = { 190, 154, 118, 82, 46 };
-    for (uint8_t i = 0; i < 5; i++) {
-        make_circle(target, size / 2, size / 2, ring_diams[i],
-                    0xffffff, LV_OPA_TRANSP, ring_colors[i], 4);
-    }
-    make_circle(target, size / 2, size / 2, 12, 0xff3333, LV_OPA_COVER, 0xffffff, 2);
-    make_label(target, "10", size / 2 + 12, size / 2 - 9, FONT_14, 0x111111);
+    lv_obj_t *image = lv_image_create(target);
+    lv_image_set_src(image, CHEST_TARGET_IMAGE_SRC);
+    lv_obj_set_pos(image, 0, 0);
+    lv_obj_set_size(image, CHEST_TARGET_IMG_W, CHEST_TARGET_IMG_H);
+    lv_obj_clear_flag(image, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(image, LV_OBJ_FLAG_SCROLLABLE);
 
     return target;
 }
@@ -433,7 +472,7 @@ static void draw_chest_target(void)
 static void create_cal_base(bool chest)
 {
     clear_scene();
-    set_screen_bg(chest ? 0x1f4e2c : 0x000000);
+    set_screen_bg(chest ? 0x161c26 : 0x000000);
     s_scene = chest ? APP_SCENE_CAL_CHEST : APP_SCENE_CAL_CIRCLE;
     s_cal_is_chest = chest;
 
@@ -449,7 +488,7 @@ static void create_cal_base(bool chest)
         draw_round_target();
     }
     target_apply_pos();
-    update_cal_status();
+    update_cal_status(true);
 }
 
 static void load_cal_scene(bool chest)
@@ -480,7 +519,7 @@ static void mark_saved_point(point_i_t p, uint8_t idx)
 static void show_saved_points(void)
 {
     clear_scene();
-    set_screen_bg(s_cal_is_chest ? 0x1f4e2c : 0x000000);
+    set_screen_bg(s_cal_is_chest ? 0x161c26 : 0x000000);
     s_title = make_label(s_screen, s_cal_is_chest ? "3 已保存胸环中心" : "2 已保存圆靶点位",
                          18, 16, FONT_24, 0xffffff);
     s_status = make_label(s_screen, "", 500, 18, FONT_20, 0xffffff);
@@ -490,7 +529,7 @@ static void show_saved_points(void)
         mark_saved_point(s_saved_points[i], i);
     }
     s_cal_phase = CAL_PHASE_SHOW_POINTS;
-    update_cal_status();
+    update_cal_status(true);
 }
 
 static void show_score(void)
@@ -542,7 +581,7 @@ static void show_score(void)
 
     make_label(s_screen, "O重置   ESC", 70, 342, FONT_20, 0x9fb1c1);
     s_cal_phase = CAL_PHASE_SHOW_RESULT;
-    update_cal_status();
+    update_cal_status(true);
 }
 
 static void save_current_point(void)
@@ -555,7 +594,7 @@ static void save_current_point(void)
         s_point_index++;
         four_point_target_default();
         target_apply_pos();
-        update_cal_status();
+        update_cal_status(true);
     } else {
         show_saved_points();
     }
@@ -565,8 +604,12 @@ static void move_target(int32_t dx, int32_t dy)
 {
     s_target_pos.x += dx;
     s_target_pos.y += dy;
-    target_apply_pos();
-    update_cal_status();
+    if (s_cal_is_chest) {
+        animate_chest_target_to_pos();
+    } else {
+        target_apply_pos();
+    }
+    update_cal_status(false);
 }
 
 static void enter_selected_menu_item(void)
@@ -686,7 +729,7 @@ static void handle_menu_key(uint32_t key)
 
 static void handle_aim_key(uint32_t key)
 {
-    int32_t step = MOVE_STEP_PX;
+    int32_t step = AIM_MOVE_STEP_PX;
     if (key == LV_KEY_UP) {
         s_peep_pos.y -= step;
         if (s_aim_linked) {
@@ -746,7 +789,7 @@ static void handle_cal_key(uint32_t key)
         return;
     }
 
-    int32_t step = MOVE_STEP_PX;
+    int32_t step = CAL_MOVE_STEP_PX;
     if (key == LV_KEY_NEXT || key == LV_KEY_PREV) {
         step = FAST_MOVE_STEP_PX;
     }
@@ -821,7 +864,7 @@ static void screen_pointer_event_cb(lv_event_t *e)
         s_target_pos.x = clamp_i32(p.x, 0, DISP_W - 1);
         s_target_pos.y = clamp_i32(p.y, 0, DISP_H - 1);
         target_apply_pos();
-        update_cal_status();
+        update_cal_status(false);
     }
 }
 

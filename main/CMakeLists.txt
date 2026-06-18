@@ -11,6 +11,7 @@ set(include_dirs ".")
 
 set(mmap_asset_build_dir "${CMAKE_CURRENT_BINARY_DIR}/mmap_assets")
 set(mmap_asset_files
+    "${mmap_asset_build_dir}/chest_target.png"
     "${mmap_asset_build_dir}/front_sight.png"
     "${mmap_asset_build_dir}/MiSans-Regular.ttf"
 )
@@ -42,12 +43,16 @@ add_custom_command(
     OUTPUT ${mmap_asset_files}
     COMMAND ${CMAKE_COMMAND} -E make_directory "${mmap_asset_build_dir}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_LIST_DIR}/assets/chest_target.png"
+            "${mmap_asset_build_dir}/chest_target.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_LIST_DIR}/assets/front_sight.png"
             "${mmap_asset_build_dir}/front_sight.png"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_LIST_DIR}/assets/MiSans/ttf/MiSans-Regular.ttf"
             "${mmap_asset_build_dir}/MiSans-Regular.ttf"
     DEPENDS
+            "${CMAKE_CURRENT_LIST_DIR}/assets/chest_target.png"
             "${CMAKE_CURRENT_LIST_DIR}/assets/front_sight.png"
             "${CMAKE_CURRENT_LIST_DIR}/assets/MiSans/ttf/MiSans-Regular.ttf"
     VERBATIM
